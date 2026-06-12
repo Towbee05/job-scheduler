@@ -7,3 +7,4 @@ django-cors-headers
 channels 
 channels-redis
 daphne
+whitenoise

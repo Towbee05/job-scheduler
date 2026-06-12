@@ -1,0 +1,231 @@
+{
+  "info": {
+    "name": "Dilamme Background Job Scheduler",
+    "description": "API for managing background jobs with priority-based scheduling, timing wheel dispatch, dependency resolution, and real-time WebSocket event broadcasting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://tobi-dilamme.duckdns.org/"
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "dlq_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Create Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('job_id', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"send_email\",\n    \"priority\": 2,\n    \"payload\": {\n        \"to\": \"user@example.com\",\n        \"subject\": \"Welcome!\",\n        \"body\": \"Thanks for signing up.\"\n    },\n    \"scheduled_at\": null,\n    \"interval\": null,\n    \"dependencies\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Create Scheduled Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"send_email\",\n    \"priority\": 3,\n    \"payload\": {\n        \"to\": \"later@example.com\",\n        \"subject\": \"Scheduled Reminder\"\n    },\n    \"scheduled_at\": \"2026-06-12T14:00:00Z\",\n    \"interval\": null,\n    \"dependencies\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Create Recurring Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"send_email\",\n    \"priority\": 3,\n    \"payload\": {\n        \"to\": \"periodic@example.com\",\n        \"subject\": \"Periodic Report\"\n    },\n    \"scheduled_at\": null,\n    \"interval\": \"every_5_minutes\",\n    \"dependencies\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Create High Priority Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"send_email\",\n    \"priority\": 1,\n    \"payload\": {\n        \"to\": \"urgent@example.com\",\n        \"subject\": \"Urgent Alert\"\n    },\n    \"scheduled_at\": null,\n    \"interval\": null,\n    \"dependencies\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "List All Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs?limit=15&page=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"],
+              "query": [
+                { "key": "limit", "value": "15" },
+                { "key": "page", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Jobs by Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs?limit=15&page=1&status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs"],
+              "query": [
+                { "key": "limit", "value": "15" },
+                { "key": "page", "value": "1" },
+                { "key": "status", "value": "pending" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs/{{job_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs", "{{job_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Job",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/jobs/{{job_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "jobs", "{{job_id}}", "cancel"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dead Letter Queue",
+      "item": [
+        {
+          "name": "List DLQ Entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dlq",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dlq"]
+            }
+          }
+        },
+        {
+          "name": "Retry Failed Job from DLQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log('Job retried successfully');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dlq/{{dlq_id}}/retry",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dlq", "{{dlq_id}}", "retry"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Statistics",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "stats"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
