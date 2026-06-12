@@ -62,20 +62,20 @@ erDiagram
     }
     JobDependency {
         uuid id PK
-        fk parent_job "must complete first"
-        fk child_job "waits for parent"
+        uuid parent_job FK
+        uuid child_job FK
     }
     DeadLetterQueue {
         uuid id PK
-        fk job
+        uuid job FK
         text error
         datetime failed_at
         bool resolved
     }
 
-    Job ||--o{ JobDependency : "as_parent"
-    Job ||--o{ JobDependency : "as_child"
-    Job ||--o| DeadLetterQueue : ""
+    Job ||--o{ JobDependency : "parent"
+    Job ||--o{ JobDependency : "child"
+    Job ||--o| DeadLetterQueue : "moves to"
 ```
 
 ---
