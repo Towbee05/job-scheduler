@@ -1,0 +1,66 @@
+# ==============================================================================
+# STAGE 1: Build & Install Dependencies
+# ==============================================================================
+FROM python:3.13-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system compilation dependencies required for packages like psycopg2 or Pillow
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install wheels to a dedicated directory
+RUN pip install --no-cache-dir --upgrade pip
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+
+# ==============================================================================
+# STAGE 2: Final Production Runtime Image
+# ==============================================================================
+FROM python:3.13-slim AS runner
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
+WORKDIR /app
+
+# Install minimal lightweight runtime libraries (e.g., libpq for PostgreSQL)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built wheels from stage 1 and install them
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels requirements.txt
+
+# Create a secure non-root system user and group to execute the application
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -m -s /bin/bash appuser
+
+# Pre-create standard static and media asset paths with proper user ownership
+RUN mkdir -p /app/staticfiles /app/mediafiles && \
+    chown -R appuser:appgroup /app
+
+# Copy the actual Django project codebase into the working container
+COPY --chown=appuser:appgroup . .
+
+# Inform container runtimes of the targeted traffic port
+EXPOSE 8000
+
+# Switch context permanently away from root to the unprivileged appuser
+USER appuser
+
+# Collect static files for swagger docs and admin panel
+RUN python manage.py collectstatic --noinput
+
+# Execute the daphne asgi server natively using Gunicorn
+CMD daphne -b 0.0.0.0 -p $PORT scheduler.asgi:application
