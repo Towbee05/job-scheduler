@@ -4,6 +4,14 @@
 
 Dilamme is a background job scheduler that polls the database for pending jobs, uses a **Timing Wheel** algorithm for time-based scheduling and a **Priority Heap** for priority-based dispatch, then assigns tasks to workers for processing. It supports **job dependencies**, **recurring intervals**, **priority aging** (anti-starvation), **exponential backoff retries**, and a **Dead Letter Queue** with threshold alerts. Real-time job events are broadcast over WebSocket via Redis.
 
+## Tech stack
+1. Next.js (frontend)
+2. Django (backend)
+3. Django-Ninja (backend)
+4. Docker
+5. Nginx
+6. Redis
+
 ---
 
 ## System Context
@@ -111,6 +119,7 @@ Every 60 seconds a job sits in PENDING state, its `mutated_priority` decreases b
 Workers claim a job via an atomic DB update: `WHERE status=PENDING` → `SET status=PROCESSING`. If the update affects 0 rows, another worker already claimed it. No distributed lock needed.
 
 ### 4. Retry with Jittered Exponential Backoff
+To simulate a real email-processing scenrio, the email task is set to fail with a probability of 0.4 
 
 | Attempt | Base Delay | Actual (with ±20% jitter) |
 |---------|-----------|---------------------------|
@@ -122,7 +131,7 @@ After 3 failures, the job goes to the **Dead Letter Queue**. If the DLQ has ≥ 
 
 ### 5. Dependency Resolution
 
-Job dependencies are modeled as a M2M through `JobDependency`. The allocator checks: all parents must be COMPLETED; if any parent is FAILED, the child is immediately failed and pushed to DLQ.
+Job dependencies are modeled as a many to many field through `JobDependency`. The allocator checks: all parents must be COMPLETED; if any parent is FAILED, the child is immediately failed and pushed to DLQ.
 
 ### 6. Recurring Jobs
 
@@ -131,36 +140,4 @@ When a job with `interval` field completes, a new `Job` is created with `schedul
 ---
 
 ## Deployment
-
-```mermaid
-flowchart LR
-  subgraph Infra["Docker Compose"]
-    PG["PostgreSQL:17"]
-    PgA["PgAdmin\nport 8080"]
-    RD["Redis 7.4\nport 6379"]
-    RDI["Redis Insight\nport 5540"]
-    BE["Backend\nport 8000"]
-    W["Worker"]
-    FE["Frontend\nport 3000"]
-  end
-
-  BE --> PG
-  BE --> RD
-  W --> PG
-  W --> RD
-  FE --> BE
-  PgA --> PG
-  RDI --> RD
-```
-
-| Service | Image | Purpose |
-|---------|-------|---------|
-| `postgres` | postgres:17 | Primary database |
-| `pgadmin_web` | dpage/pgadmin4 | DB administration UI (port 8080) |
-| `redis` | redis:7.4-alpine | Channel layer for WebSocket (port 6379) |
-| `redis-insight` | redis/redisinsight | Redis admin UI (port 5540) |
-| `backend` | custom Dockerfile | Django dev server (port 8000); runs REST API + WebSocket |
-| `worker` | custom Dockerfile | `python manage.py run_workers`; runs allocator, timing wheel, and worker pool |
-| `frontend` | custom Dockerfile | Next.js dev server (port 3000) |
-
-A production variant (`docker-compose.prod.yml`) is also available.
+Application was deployed on a Virtual private server hosted by Oracle, accessible through ssh
