@@ -1,0 +1,9 @@
+django
+django-ninja
+python-dotenv
+psycopg2-binary
+python-json-logger
+django-cors-headers
+channels 
+channels-redis
+daphne
