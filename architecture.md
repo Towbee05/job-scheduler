@@ -14,30 +14,11 @@ Dilamme is a background job scheduler that polls the database for pending jobs, 
 
 ---
 
-## System Context
+## System Architecture
 
-```mermaid
-C4Context
-  title System Context — Dilamme Background Job Scheduler
+A drawio diagram showing how job is being scheduled
 
-  Person(user, "User", "Creates & monitors jobs via UI or API")
-
-  System_Boundary(dilamme, "Dilamme System") {
-    Container(frontend, "Frontend", "Next.js", "Dashboard UI for job management")
-    Container(backend, "Backend API", "Django + Ninja", "REST API & WebSocket server")
-    Container(worker, "Worker", "Django management command", "Consumes & processes jobs")
-    ContainerDb(postgres, "PostgreSQL", "Relational DB", "Jobs, dependencies, DLQ")
-    ContainerDb(redis, "Redis", "In-memory DB", "Channel layer for WebSocket events")
-  }
-
-  Rel(user, frontend, "Uses", "HTTPS")
-  Rel(frontend, backend, "REST + WebSocket", "HTTPS/WS")
-  Rel(backend, postgres, "Reads/Writes", "SQL")
-  Rel(worker, postgres, "Reads/Writes", "SQL")
-  Rel(backend, redis, "Pub/Sub", "TCP")
-  Rel(worker, redis, "broadcast_event()", "TCP")
-  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
-```
+- [image](./images/job-scheduler.png)
 
 ---
 
@@ -119,7 +100,7 @@ Every 60 seconds a job sits in PENDING state, its `mutated_priority` decreases b
 Workers claim a job via an atomic DB update: `WHERE status=PENDING` → `SET status=PROCESSING`. If the update affects 0 rows, another worker already claimed it. No distributed lock needed.
 
 ### 4. Retry with Jittered Exponential Backoff
-To simulate a real email-processing scenrio, the email task is set to fail with a probability of 0.4 
+To simulate a real email-processing scenrio, the email task is set to fail with a probability of 0.4, also jobs are processed between 2-6 secs
 
 | Attempt | Base Delay | Actual (with ±20% jitter) |
 |---------|-----------|---------------------------|
